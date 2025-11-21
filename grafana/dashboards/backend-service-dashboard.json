@@ -1,0 +1,120 @@
+{
+  "title": "Backend Service Dashboard",
+  "uid": "backend-service",
+  "tags": ["backend", "nodejs", "api"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "HTTP Request Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "rate(http_requests_total{job=\"backend\"}[5m])",
+        "legendFormat": "{{method}} {{route}} - {{status_code}}"
+      }],
+      "yaxes": [{"format": "reqps"}, {"format": "short"}]
+    },
+    {
+      "title": "HTTP Request Latency (p95)",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"backend\"}[5m]))",
+        "legendFormat": "{{method}} {{route}}"
+      }],
+      "yaxes": [{"format": "s"}, {"format": "short"}]
+    },
+    {
+      "title": "Error Rate (5xx)",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{
+        "expr": "rate(http_requests_total{job=\"backend\",status_code=~\"5..\"}[5m])",
+        "legendFormat": "{{method}} {{route}} - {{status_code}}"
+      }],
+      "yaxes": [{"format": "reqps"}, {"format": "short"}],
+      "alert": {
+        "conditions": [{"evaluator": {"params": [0.05], "type": "gt"}}]
+      }
+    },
+    {
+      "title": "Success Rate (%)",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{
+        "expr": "(1 - (rate(http_requests_total{job=\"backend\",status_code=~\"5..\"}[5m]) / rate(http_requests_total{job=\"backend\"}[5m]))) * 100",
+        "legendFormat": "Success Rate"
+      }],
+      "yaxes": [{"format": "percent", "max": 100, "min": 0}, {"format": "short"}]
+    },
+    {
+      "title": "CPU Usage",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{
+        "expr": "rate(container_cpu_usage_seconds_total{name=\"login_backend\"}[1m]) * 100",
+        "legendFormat": "CPU %"
+      }],
+      "yaxes": [{"format": "percent", "max": 100}, {"format": "short"}]
+    },
+    {
+      "title": "Memory Usage",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{
+        "expr": "container_memory_usage_bytes{name=\"login_backend\"}",
+        "legendFormat": "Memory Used"
+      }, {
+        "expr": "container_spec_memory_limit_bytes{name=\"login_backend\"}",
+        "legendFormat": "Memory Limit"
+      }],
+      "yaxes": [{"format": "bytes"}, {"format": "short"}]
+    },
+    {
+      "title": "Node.js Event Loop Lag",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "targets": [{
+        "expr": "nodejs_eventloop_lag_seconds{job=\"backend\"}",
+        "legendFormat": "Event Loop Lag"
+      }],
+      "yaxes": [{"format": "s"}, {"format": "short"}]
+    },
+    {
+      "title": "Heap Memory Usage",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "targets": [{
+        "expr": "nodejs_heap_size_used_bytes{job=\"backend\"}",
+        "legendFormat": "Heap Used"
+      }, {
+        "expr": "nodejs_heap_size_total_bytes{job=\"backend\"}",
+        "legendFormat": "Heap Total"
+      }],
+      "yaxes": [{"format": "bytes"}, {"format": "short"}]
+    },
+    {
+      "title": "Active Handles & Requests",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "targets": [{
+        "expr": "nodejs_active_handles{job=\"backend\"}",
+        "legendFormat": "Active Handles"
+      }, {
+        "expr": "nodejs_active_requests{job=\"backend\"}",
+        "legendFormat": "Active Requests"
+      }],
+      "yaxes": [{"format": "short"}, {"format": "short"}]
+    },
+    {
+      "title": "Garbage Collection Duration",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+      "targets": [{
+        "expr": "rate(nodejs_gc_duration_seconds_sum{job=\"backend\"}[5m])",
+        "legendFormat": "{{kind}}"
+      }],
+      "yaxes": [{"format": "s"}, {"format": "short"}]
+    }
+  ]
+}

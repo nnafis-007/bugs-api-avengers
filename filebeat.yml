@@ -1,0 +1,45 @@
+filebeat.inputs:
+  - type: container
+    paths:
+      - '/var/lib/docker/containers/*/*.log'
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+      - drop_event:
+          when:
+            not:
+              or:
+                - equals:
+                    container.name: "login_backend"
+                - equals:
+                    container.name: "campaign_service"
+                - equals:
+                    container.name: "login_backend_consumer"
+                - equals:
+                    container.name: "login_kafka"
+                - equals:
+                    container.name: "login_db"
+                - equals:
+                    container.name: "campaign_redis"
+
+# Output to Elasticsearch with conditional indices
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  indices:
+    - index: "registration-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        message: "register"
+    - index: "filebeat-%{+yyyy.MM.dd}"
+
+# Allow index name customization
+setup.ilm.enabled: false
+setup.template.name: "filebeat"
+setup.template.pattern: "filebeat-*"
+
+# Logging
+logging.level: info
+logging.to_stderr: true

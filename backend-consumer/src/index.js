@@ -1,4 +1,61 @@
+// Initialize OpenTelemetry tracing FIRST (before any other imports)
+require('./tracing');
+
 const { Kafka } = require('kafkajs');
+const express = require('express');
+const client = require('prom-client');
+const { trace, context } = require('@opentelemetry/api');
+
+// Prometheus metrics setup
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+// Custom metrics for Kafka consumer
+const messagesProcessedCounter = new client.Counter({
+  name: 'kafka_consumer_messages_processed_total',
+  help: 'Total number of Kafka messages processed',
+  labelNames: ['topic', 'status'],
+  registers: [register]
+});
+
+const messageProcessingDuration = new client.Histogram({
+  name: 'kafka_consumer_message_processing_duration_seconds',
+  help: 'Time taken to process a message',
+  labelNames: ['topic'],
+  buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2],
+  registers: [register]
+});
+
+const consumerLagGauge = new client.Gauge({
+  name: 'kafka_consumer_lag',
+  help: 'Consumer lag in messages',
+  labelNames: ['topic', 'partition'],
+  registers: [register]
+});
+
+const consumerErrorCounter = new client.Counter({
+  name: 'kafka_consumer_errors_total',
+  help: 'Total number of consumer errors',
+  labelNames: ['topic', 'error_type'],
+  registers: [register]
+});
+
+// Create Express app for metrics endpoint
+const app = express();
+const METRICS_PORT = process.env.METRICS_PORT || 9091;
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'backend-consumer' });
+});
+
+app.listen(METRICS_PORT, () => {
+  console.log(`Metrics server listening on port ${METRICS_PORT}`);
+});
 
 // Environment variables are provided via docker-compose
 
@@ -46,6 +103,7 @@ async function startConsumer() {
     // Start consuming messages
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
+        const start = Date.now();
         try {
           const userData = JSON.parse(message.value.toString());
           
@@ -60,8 +118,15 @@ async function startConsumer() {
           console.log('Partition:', partition);
           console.log('========================================\n');
           
+          // Record successful processing
+          const duration = (Date.now() - start) / 1000;
+          messageProcessingDuration.observe({ topic }, duration);
+          messagesProcessedCounter.inc({ topic, status: 'success' });
+          
         } catch (error) {
           console.error('Error processing message:', error);
+          consumerErrorCounter.inc({ topic, error_type: error.name || 'unknown' });
+          messagesProcessedCounter.inc({ topic, status: 'error' });
         }
       },
     });
