@@ -8,8 +8,8 @@ export default function App() {
   const [password, setPassword] = useState('')
   const [token, setToken] = useState(null)
   const [message, setMessage] = useState('')
-  const [products, setProducts] = useState([])
-  const [showProducts, setShowProducts] = useState(false)
+  const [campaigns, setCampaigns] = useState([])
+  const [showCampaigns, setShowCampaigns] = useState(false)
 
   async function register() {
     const res = await fetch(`${apiBase}/api/register`, {
@@ -31,8 +31,8 @@ export default function App() {
     if (data.token) {
       setToken(data.token)
       setMessage('Logged in successfully!')
-      // Fetch products after successful login
-      await fetchProducts()
+      // Fetch campaigns after successful login
+      await fetchCampaigns()
     } else {
       setMessage(JSON.stringify(data))
     }
@@ -46,17 +46,17 @@ export default function App() {
     setMessage(JSON.stringify(data))
   }
 
-  async function fetchProducts() {
+  async function fetchCampaigns() {
     try {
-      const res = await fetch(`${apiBase}/api/products`)
+      const res = await fetch(`${apiBase}/api/campaigns`)
       const data = await res.json()
-      if (data.products) {
-        setProducts(data.products)
-        setShowProducts(true)
-        setMessage(`Loaded ${data.products.length} products`)
+      if (data.campaigns) {
+        setCampaigns(data.campaigns)
+        setShowCampaigns(true)
+        setMessage(`Loaded ${data.campaigns.length} campaigns`)
       }
     } catch (err) {
-      setMessage('Failed to fetch products: ' + err.message)
+      setMessage('Failed to fetch campaigns: ' + err.message)
     }
   }
 
@@ -71,33 +71,33 @@ export default function App() {
         <button onClick={register}>Register</button>
         <button onClick={login}>Login</button>
         <button onClick={profile} disabled={!token}>Profile</button>
-        <button onClick={fetchProducts} disabled={!token}>Refresh Products</button>
+        <button onClick={fetchCampaigns} disabled={!token}>Refresh Campaigns</button>
         <div style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>{message}</div>
       </div>
 
-      {showProducts && products.length > 0 && (
+      {showCampaigns && campaigns.length > 0 && (
         <div style={{ marginTop: 30 }}>
-          <h3>Available Products</h3>
+          <h3>Active Campaigns</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
-            {products.map(product => (
-              <div key={product.id} style={{ 
+            {campaigns.map(campaign => (
+              <div key={campaign.id} style={{ 
                 border: '1px solid #ddd', 
                 borderRadius: 8, 
                 padding: 16,
                 backgroundColor: '#f9f9f9'
               }}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>{product.name}</h4>
-                <p style={{ margin: '5px 0', fontSize: 14, color: '#666' }}>{product.description}</p>
+                <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>{campaign.name}</h4>
                 <div style={{ marginTop: 10 }}>
                   <span style={{ fontSize: 18, fontWeight: 'bold', color: '#2c5282' }}>
-                    ${parseFloat(product.price).toFixed(2)}
+                    ${parseFloat(campaign.total_amount_raised).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                  <span style={{ marginLeft: 15, fontSize: 14, color: product.stock > 0 ? '#38a169' : '#e53e3e' }}>
-                    {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                  <span style={{ marginLeft: 10, fontSize: 14, color: '#666' }}>
+                    raised
                   </span>
                 </div>
-                <div style={{ marginTop: 8, fontSize: 12, color: '#999' }}>
-                  Category: {product.category}
+                <div style={{ marginTop: 10, fontSize: 12, color: '#999' }}>
+                  <div>Created: {new Date(campaign.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                  <div style={{ marginTop: 4 }}>Updated: {new Date(campaign.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
                 </div>
               </div>
             ))}
