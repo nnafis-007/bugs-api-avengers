@@ -1,12 +1,66 @@
+// Initialize OpenTelemetry tracing first (before any other requires)
+require('./tracing');
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { publishDonation } = require('./kafka-producer');
+const promClient = require('prom-client');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Initialize Prometheus metrics
+const register = new promClient.Registry();
+promClient.collectDefaultMetrics({ register });
+
+// Custom metrics for donation service
+const donationsTotal = new promClient.Counter({
+  name: 'donations_total',
+  help: 'Total number of donations received',
+  labelNames: ['status', 'campaign_id'],
+  registers: [register]
+});
+
+const donationAmount = new promClient.Histogram({
+  name: 'donation_amount_usd',
+  help: 'Donation amounts in USD',
+  labelNames: ['campaign_id'],
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000],
+  registers: [register]
+});
+
+const idempotencyCacheSize = new promClient.Gauge({
+  name: 'idempotency_cache_size',
+  help: 'Current number of entries in idempotency cache',
+  registers: [register]
+});
+
+const idempotencyHits = new promClient.Counter({
+  name: 'idempotency_hits_total',
+  help: 'Total number of duplicate requests prevented by idempotency',
+  registers: [register]
+});
+
+const httpRequestDuration = new promClient.Histogram({
+  name: 'donation_http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10],
+  registers: [register]
+});
+
+// Middleware to track request duration
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+    httpRequestDuration.labels(req.method, req.path, res.statusCode.toString()).observe(duration);
+  });
+  next();
+});
 
 const PORT = process.env.PORT || 6000;
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret';
@@ -87,6 +141,7 @@ app.post('/api/donate', authMiddleware, async (req, res) => {
     if (cachedResponse) {
       console.log(`🔁 Idempotent request detected for key: ${idempotencyKey.substring(0, 20)}...`);
       console.log(`   Returning cached response for user: ${req.user.email}`);
+      idempotencyHits.inc();
       return res.status(200).json({
         ...cachedResponse.response,
         replayed: true,
@@ -125,6 +180,10 @@ app.post('/api/donate', authMiddleware, async (req, res) => {
     console.log(`📝 Processing NEW donation from ${req.user.email} for campaign ${campaignId}: $${amount}`);
     console.log(`   Idempotency Key: ${idempotencyKey.substring(0, 20)}...`);
     
+    // Record metrics
+    donationsTotal.labels('pending', campaignId.toString()).inc();
+    donationAmount.labels(campaignId.toString()).observe(parseFloat(amount));
+    
     // Publish donation event to Kafka
     await publishDonation(donationData);
     
@@ -146,6 +205,9 @@ app.post('/api/donate', authMiddleware, async (req, res) => {
       response: successResponse,
       timestamp: Date.now()
     });
+    
+    // Update cache size metric
+    idempotencyCacheSize.set(idempotencyCache.size);
     
     console.log(`✅ Donation processed and cached with idempotency key`);
     console.log(`   Cache size: ${idempotencyCache.size} entries`);
@@ -170,7 +232,18 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'donation-service' });
 });
 
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Donation service listening on port ${PORT}`);
   console.log(`💰 Ready to accept donations at POST /api/donate`);
+  console.log(`📊 Metrics available at GET /metrics`);
 });

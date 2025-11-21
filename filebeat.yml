@@ -20,11 +20,19 @@ filebeat.inputs:
                 - equals:
                     container.name: "login_backend_consumer"
                 - equals:
+                    container.name: "donation_service"
+                - equals:
+                    container.name: "payment_service"
+                - equals:
+                    container.name: "notification_service"
+                - equals:
                     container.name: "login_kafka"
                 - equals:
                     container.name: "login_db"
                 - equals:
                     container.name: "campaign_redis"
+                - equals:
+                    container.name: "payment_db"
 
 # Output to Elasticsearch with conditional indices
 output.elasticsearch:

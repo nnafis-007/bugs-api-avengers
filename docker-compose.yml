@@ -143,6 +143,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-devsecret}
       - KAFKA_BROKER=kafka:9092
       - PORT=6000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_SERVICE_NAME=donation-service
     depends_on:
       kafka:
         condition: service_healthy
@@ -156,6 +158,8 @@ services:
       context: ./notification-service
     environment:
       - KAFKA_BROKER=kafka:9092
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_SERVICE_NAME=notification-service
     depends_on:
       kafka:
         condition: service_healthy
@@ -170,6 +174,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:123@payment-db:5432/payment_db
       - KAFKA_BROKER=kafka:9092
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_SERVICE_NAME=payment-service
     depends_on:
       payment-db:
         condition: service_healthy
@@ -330,15 +336,17 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - SERVER_BASEPATH=/kibana
       - SERVER_REWRITEBASEPATH=true
+      - LOGGING_ROOT_LEVEL=warn
     depends_on:
       elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5601/kibana/api/status || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
     networks:
       - app-net
 
@@ -367,10 +375,7 @@ services:
       - COLLECTOR_OTLP_ENABLED=true
       - SPAN_STORAGE_TYPE=memory
       - MEMORY_MAX_TRACES=10000
-    ports:
-      - "16686:16686"  # Jaeger UI
-      - "4317:4317"    # OTLP gRPC receiver
-      - "4318:4318"    # OTLP HTTP receiver
+      - QUERY_BASE_PATH=/jaeger
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:16686 || exit 1"]

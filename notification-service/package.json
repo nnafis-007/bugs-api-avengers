@@ -7,7 +7,12 @@
     "dev": "nodemon src/index.js"
   },
   "dependencies": {
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "@opentelemetry/sdk-node": "^0.41.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.37.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.41.0",
+    "@opentelemetry/resources": "^1.15.0",
+    "@opentelemetry/semantic-conventions": "^1.15.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

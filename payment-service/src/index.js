@@ -1,3 +1,6 @@
+// Initialize OpenTelemetry tracing first (before any other requires)
+require('./tracing');
+
 require('dotenv').config();
 const { Kafka } = require('kafkajs');
 const { initDb, getUserBalance, deductBalance, createUserAccount } = require('./db');

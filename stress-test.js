@@ -6,6 +6,9 @@ const TARGET_PORT = process.env.TARGET_PORT || 80;
 const NUM_REQUESTS = parseInt(process.env.NUM_REQUESTS) || 100;
 const CONCURRENT_REQUESTS = parseInt(process.env.CONCURRENT_REQUESTS) || 10;
 
+// Store auth tokens for donation testing
+let authToken = null;
+
 // Test scenarios
 const SCENARIOS = {
   'register': {
@@ -22,7 +25,13 @@ const SCENARIOS = {
     body: () => ({
       email: 'testuser@test.com',
       password: 'Test123!@#'
-    })
+    }),
+    onSuccess: (response) => {
+      if (response.token) {
+        authToken = response.token;
+        console.log('   ✅ Auth token captured for donation testing');
+      }
+    }
   },
   'campaigns': {
     method: 'GET',
@@ -33,6 +42,32 @@ const SCENARIOS = {
     method: 'GET',
     path: '/api/campaigns/1',
     body: () => null
+  },
+  'donate': {
+    method: 'POST',
+    path: '/api/donate',
+    requiresAuth: true,
+    body: () => ({
+      campaignId: Math.floor(Math.random() * 3) + 1, // Campaign 1, 2, or 3
+      amount: (Math.random() * 100 + 5).toFixed(2) // Random amount between $5 and $105
+    }),
+    headers: () => ({
+      'Authorization': `Bearer ${authToken}`,
+      'Idempotency-Key': `${Date.now()}-${Math.random().toString(36).substr(2, 16)}`
+    })
+  },
+  'donate-idempotent': {
+    method: 'POST',
+    path: '/api/donate',
+    requiresAuth: true,
+    body: () => ({
+      campaignId: 1,
+      amount: '50.00'
+    }),
+    headers: () => ({
+      'Authorization': `Bearer ${authToken}`,
+      'Idempotency-Key': 'SAME-KEY-FOR-ALL-REQUESTS' // Test idempotency with same key
+    })
   }
 };
 
@@ -49,6 +84,7 @@ function makeRequest(scenario) {
   return new Promise((resolve) => {
     const startTime = Date.now();
     const body = scenario.body ? JSON.stringify(scenario.body()) : null;
+    const customHeaders = scenario.headers ? scenario.headers() : {};
     
     const options = {
       hostname: TARGET_HOST,
@@ -58,7 +94,8 @@ function makeRequest(scenario) {
       headers: {
         'Content-Type': 'application/json',
         'X-Correlation-ID': `stress-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {})
+        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
+        ...customHeaders
       }
     };
 
@@ -76,6 +113,16 @@ function makeRequest(scenario) {
         
         if (res.statusCode >= 200 && res.statusCode < 300) {
           stats.success++;
+          
+          // Call onSuccess callback if provided
+          if (scenario.onSuccess) {
+            try {
+              const parsedData = JSON.parse(data);
+              scenario.onSuccess(parsedData);
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
         } else {
           stats.failed++;
           const errorKey = `${res.statusCode}`;
@@ -109,10 +156,24 @@ async function runStressTest(scenarioName, numRequests, concurrent) {
     process.exit(1);
   }
 
+  // Check if scenario requires authentication
+  if (scenario.requiresAuth && !authToken) {
+    console.log(`\n⚠️  Scenario '${scenarioName}' requires authentication. Running login first...\n`);
+    const loginResult = await makeRequest(SCENARIOS['login']);
+    if (loginResult.statusCode !== 200) {
+      console.error(`   ❌ Login failed with status ${loginResult.statusCode}`);
+      process.exit(1);
+    }
+    console.log(`   ✅ Login successful, proceeding with ${scenarioName}\n`);
+  }
+
   console.log(`\n🚀 Starting stress test: ${scenarioName}`);
   console.log(`   Target: http://${TARGET_HOST}:${TARGET_PORT}${scenario.path}`);
   console.log(`   Requests: ${numRequests}`);
   console.log(`   Concurrency: ${concurrent}`);
+  if (scenario.requiresAuth) {
+    console.log(`   Auth: Using Bearer token`);
+  }
   console.log(`   Started at: ${new Date().toISOString()}\n`);
 
   const startTime = Date.now();

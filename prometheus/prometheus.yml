@@ -52,6 +52,15 @@ scrape_configs:
       target_label: service
       replacement: backend-consumer
 
+  - job_name: "donation-service"
+    scrape_interval: 15s
+    static_configs:
+    - targets: ["donation-service:6000"]
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: service
+      replacement: donation-service
+
   - job_name: "postgres"
     scrape_interval: 15s
     static_configs:

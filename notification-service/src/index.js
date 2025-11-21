@@ -1,3 +1,6 @@
+// Initialize OpenTelemetry tracing first (before any other requires)
+require('./tracing');
+
 const { Kafka } = require('kafkajs');
 
 const kafka = new Kafka({
