@@ -1,9 +1,13 @@
+// Initialize OpenTelemetry tracing FIRST (before any other imports)
+require('./tracing');
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const client = require('prom-client');
+const { trace, context } = require('@opentelemetry/api');
 const { pool, initDb } = require('./db');
 const { publishUserRegistration } = require('./kafka-producer');
 
@@ -39,6 +43,27 @@ app.get('/metrics', async (req, res) => {
 // Now add middleware
 app.use(cors());
 app.use(express.json());
+
+// Correlation ID middleware for end-to-end tracing
+app.use((req, res, next) => {
+  const correlationId = req.headers['x-correlation-id'] || 
+                       req.headers['x-request-id'] || 
+                       trace.getActiveSpan()?.spanContext().traceId || 
+                       `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  req.correlationId = correlationId;
+  res.setHeader('X-Correlation-ID', correlationId);
+  
+  // Add to OpenTelemetry span
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.setAttribute('correlation.id', correlationId);
+    span.setAttribute('http.user_agent', req.headers['user-agent'] || 'unknown');
+  }
+  
+  console.log(`[${correlationId}] ${req.method} ${req.path}`);
+  next();
+});
 
 const PORT = process.env.PORT || 4000;
 
@@ -172,8 +197,8 @@ app.post('/api/register', async (req, res) => {
     
     const newUser = r.rows[0];
     
-    // Publish user registration event to Kafka
-    await publishUserRegistration({ email });
+    // Publish user registration event to Kafka with correlation ID
+    await publishUserRegistration({ email }, req.correlationId);
     
     // Auto-login: Generate tokens for the new user
     const accessToken = jwt.sign(

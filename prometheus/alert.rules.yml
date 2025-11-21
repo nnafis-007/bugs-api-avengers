@@ -10,14 +10,14 @@ groups:
           summary: "Container {{ $labels.name }} using high CPU"
           description: "CPU usage is above 70% for more than 1 minute."
 
-      - alert: BackendDown
-        expr: up{job="backend"} == 0
+      - alert: CriticalCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name=~"login_.*"}[2m]) * 100 > 90
         for: 30s
         labels:
           severity: critical
         annotations:
-          summary: "Backend is down"
-          description: "The backend /metrics endpoint is not responding."
+          summary: "Container {{ $labels.name }} in CPU crisis"
+          description: "CPU usage is above 90%! System may become unresponsive."
 
       - alert: HighMemoryUsage
         expr: (container_memory_usage_bytes{name=~"login_.*"} / container_spec_memory_limit_bytes{name=~"login_.*"}) * 100 > 80
@@ -27,3 +27,229 @@ groups:
         annotations:
           summary: "Container {{ $labels.name }} using high memory"
           description: "Memory usage is above 80% for more than 2 minutes."
+
+      - alert: CriticalMemoryUsage
+        expr: (container_memory_usage_bytes{name=~"login_.*"} / container_spec_memory_limit_bytes{name=~"login_.*"}) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} in memory crisis"
+          description: "Memory usage is above 95%! Container may be OOM killed."
+
+  - name: service-health-alerts
+    rules:
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "The backend /metrics endpoint is not responding."
+
+      - alert: CampaignServiceDown
+        expr: up{job="campaign-service"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Campaign service is down"
+          description: "The campaign-service /metrics endpoint is not responding."
+
+      - alert: BackendConsumerDown
+        expr: up{job="backend-consumer"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend consumer is down"
+          description: "The backend-consumer is not responding. Messages may pile up."
+
+      - alert: PostgresExporterDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres exporter is down"
+          description: "Cannot collect database metrics."
+
+      - alert: RedisExporterDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis exporter is down"
+          description: "Cannot collect cache metrics."
+
+  - name: performance-alerts
+    rules:
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency detected"
+          description: "95th percentile latency is above 2 seconds."
+
+      - alert: CriticalRequestLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical request latency"
+          description: "95th percentile latency is above 5 seconds! Users experiencing severe delays."
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "More than 5% of requests are failing with 5xx errors."
+
+      - alert: CriticalErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.15
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical error rate"
+          description: "More than 15% of requests are failing! System is degraded."
+
+      - alert: RequestSurge
+        expr: rate(http_requests_total[1m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Request surge detected"
+          description: "Request rate is above 100 req/s. Monitor for potential overload."
+
+      - alert: RequestFlood
+        expr: rate(http_requests_total[1m]) > 500
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Request flood detected"
+          description: "Request rate is above 500 req/s! Possible DDoS or traffic spike."
+
+  - name: database-alerts
+    rules:
+      - alert: TooManyDatabaseConnections
+        expr: pg_stat_database_numbackends{datname="login_db"} > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of database connections"
+          description: "Database has {{ $value }} active connections."
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: pg_stat_database_numbackends{datname="login_db"} > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Database has {{ $value }} active connections. May start rejecting connections."
+
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(campaign_db_query_duration_seconds_bucket[5m])) > 1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is above 1 second."
+
+      - alert: DatabaseDeadlocks
+        expr: rate(pg_stat_database_deadlocks{datname="login_db"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database deadlocks detected"
+          description: "Deadlocks are occurring in the database."
+
+  - name: cache-alerts
+    rules:
+      - alert: LowCacheHitRate
+        expr: rate(campaign_cache_hits_total[5m]) / (rate(campaign_cache_hits_total[5m]) + rate(campaign_cache_misses_total[5m])) < 0.7
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is below 70%. Database may be overloaded."
+
+      - alert: CriticalCacheHitRate
+        expr: rate(campaign_cache_hits_total[5m]) / (rate(campaign_cache_hits_total[5m]) + rate(campaign_cache_misses_total[5m])) < 0.4
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical cache hit rate"
+          description: "Cache hit rate is below 40%! Database is under heavy load."
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache is not responding. All cache requests will fail."
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis is using {{ $value | humanizePercentage }} of allocated memory."
+
+  - name: kafka-alerts
+    rules:
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag > 100
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka consumer lag detected"
+          description: "Consumer lag is {{ $value }} messages on topic {{ $labels.topic }}."
+
+      - alert: CriticalKafkaConsumerLag
+        expr: kafka_consumer_lag > 1000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical Kafka consumer lag"
+          description: "Consumer lag is {{ $value }} messages! Processing is severely behind."
+
+      - alert: KafkaConsumerErrors
+        expr: rate(kafka_consumer_errors_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka consumer errors detected"
+          description: "Consumer is experiencing {{ $value }} errors per second."
+
+      - alert: SlowMessageProcessing
+        expr: histogram_quantile(0.95, rate(kafka_consumer_message_processing_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow Kafka message processing"
+          description: "95th percentile message processing time is above 2 seconds."

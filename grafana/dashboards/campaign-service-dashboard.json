@@ -1,0 +1,118 @@
+{
+  "title": "Campaign Service Dashboard",
+  "uid": "campaign-service",
+  "tags": ["campaign", "cache", "redis"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "API Request Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "rate(campaign_http_requests_total[5m])",
+        "legendFormat": "{{method}} {{route}} - {{status_code}}"
+      }],
+      "yaxes": [{"format": "reqps"}, {"format": "short"}]
+    },
+    {
+      "title": "API Response Time (p95)",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(campaign_http_request_duration_seconds_bucket[5m]))",
+        "legendFormat": "{{method}} {{route}}"
+      }],
+      "yaxes": [{"format": "s"}, {"format": "short"}]
+    },
+    {
+      "title": "Cache Hit Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{
+        "expr": "rate(campaign_cache_hits_total[5m]) / (rate(campaign_cache_hits_total[5m]) + rate(campaign_cache_misses_total[5m])) * 100",
+        "legendFormat": "{{cache_key_type}}"
+      }],
+      "yaxes": [{"format": "percent", "max": 100, "min": 0}, {"format": "short"}]
+    },
+    {
+      "title": "Cache Operations",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{
+        "expr": "rate(campaign_cache_hits_total[5m])",
+        "legendFormat": "Hits - {{cache_key_type}}"
+      }, {
+        "expr": "rate(campaign_cache_misses_total[5m])",
+        "legendFormat": "Misses - {{cache_key_type}}"
+      }],
+      "yaxes": [{"format": "ops"}, {"format": "short"}]
+    },
+    {
+      "title": "Redis Operation Duration",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(campaign_redis_operation_duration_seconds_bucket[5m]))",
+        "legendFormat": "{{operation}}"
+      }],
+      "yaxes": [{"format": "s"}, {"format": "short"}]
+    },
+    {
+      "title": "Database Query Duration",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(campaign_db_query_duration_seconds_bucket[5m]))",
+        "legendFormat": "{{query_type}}"
+      }],
+      "yaxes": [{"format": "s"}, {"format": "short"}]
+    },
+    {
+      "title": "Active Campaigns",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+      "targets": [{
+        "expr": "campaign_active_campaigns_total",
+        "legendFormat": "Total Campaigns"
+      }],
+      "options": {
+        "graphMode": "area",
+        "colorMode": "value"
+      }
+    },
+    {
+      "title": "Request Success Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+      "targets": [{
+        "expr": "(1 - (rate(campaign_http_requests_total{status_code=~\"5..\"}[5m]) / rate(campaign_http_requests_total[5m]))) * 100",
+        "legendFormat": "Success Rate"
+      }],
+      "options": {
+        "graphMode": "area",
+        "colorMode": "value",
+        "unit": "percent"
+      }
+    },
+    {
+      "title": "CPU Usage",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+      "targets": [{
+        "expr": "rate(container_cpu_usage_seconds_total{name=\"campaign_service\"}[1m]) * 100",
+        "legendFormat": "CPU %"
+      }],
+      "yaxes": [{"format": "percent", "max": 100}, {"format": "short"}]
+    },
+    {
+      "title": "Memory Usage",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "targets": [{
+        "expr": "container_memory_usage_bytes{name=\"campaign_service\"}",
+        "legendFormat": "Memory Used"
+      }],
+      "yaxes": [{"format": "bytes"}, {"format": "short"}]
+    }
+  ]
+}

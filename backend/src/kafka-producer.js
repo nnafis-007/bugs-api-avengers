@@ -21,14 +21,15 @@ async function connectProducer() {
   }
 }
 
-async function publishUserRegistration(userData) {
+async function publishUserRegistration(userData, correlationId = null) {
   try {
     await connectProducer();
     
     const message = {
       username: userData.email.split('@')[0], // Extract username from email
       email: userData.email,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      correlationId: correlationId || `kafka-${Date.now()}`
     };
 
     await producer.send({
@@ -37,13 +38,17 @@ async function publishUserRegistration(userData) {
         {
           key: userData.email,
           value: JSON.stringify(message),
+          headers: {
+            'correlation-id': correlationId || '',
+            'source-service': 'backend'
+          }
         },
       ],
     });
 
-    console.log('User registration event published to Kafka:', message);
+    console.log(`[${correlationId}] User registration event published to Kafka:`, message);
   } catch (error) {
-    console.error('Failed to publish to Kafka:', error);
+    console.error(`[${correlationId}] Failed to publish to Kafka:`, error);
     // Don't throw error - registration should succeed even if Kafka fails
   }
 }

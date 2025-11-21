@@ -29,6 +29,46 @@ scrape_configs:
     scrape_interval: 15s
     static_configs:
     - targets: ["backend:4000"]
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: service
+      replacement: backend
+
+  - job_name: "campaign-service"
+    scrape_interval: 15s
+    static_configs:
+    - targets: ["campaign-service:5000"]
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: service
+      replacement: campaign-service
+
+  - job_name: "backend-consumer"
+    scrape_interval: 15s
+    static_configs:
+    - targets: ["backend-consumer:9091"]
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: service
+      replacement: backend-consumer
+
+  - job_name: "postgres"
+    scrape_interval: 15s
+    static_configs:
+    - targets: ["postgres-exporter:9187"]
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: service
+      replacement: postgres-exporter
+
+  - job_name: "redis"
+    scrape_interval: 15s
+    static_configs:
+    - targets: ["redis-exporter:9121"]
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: service
+      replacement: redis-exporter
 
   - job_name: "node"
     static_configs:
