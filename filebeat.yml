@@ -38,9 +38,24 @@ filebeat.inputs:
 output.elasticsearch:
   hosts: ["elasticsearch:9200"]
   indices:
+    - index: "donation-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        message: "donation"
+    - index: "balance-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        message: "balance"
+    - index: "payment-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        message: "payment"
+    - index: "processing-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        message: "processing"
     - index: "registration-logs-%{+yyyy.MM.dd}"
       when.contains:
         message: "register"
+    - index: "campaign-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        message: "campaign"
     - index: "filebeat-%{+yyyy.MM.dd}"
 
 # Allow index name customization
