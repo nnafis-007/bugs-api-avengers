@@ -167,14 +167,6 @@ node stress-test.js register 100 10  # Messages pile up
 docker start login_backend_consumer  # Consumer catches up
 ```
 
-## 📚 Documentation
-
-- **[SETUP_COMPLETE.md](./SETUP_COMPLETE.md)**: Quick reference guide
-- **[TRACING_AND_LOGGING_GUIDE.md](./TRACING_AND_LOGGING_GUIDE.md)**: Complete tracing & logging guide
-- **[MONITORING_GUIDE.md](./MONITORING_GUIDE.md)**: Prometheus & Grafana setup
-- **[JWT_IMPLEMENTATION.md](./backend/JWT_IMPLEMENTATION.md)**: JWT authentication details
-- **[filebeat.yml](./filebeat.yml)**: Log collection configuration
-
 ## CI/CD
 
 The GitHub Actions workflow deploys to Azure VM on push to main.
