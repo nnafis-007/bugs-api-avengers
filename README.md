@@ -30,7 +30,7 @@ node stress-test.js campaigns 100 10
 
 | Service | URL | Credentials | Purpose |
 |---------|-----|-------------|---------|
-| **Application** | http://localhost | - | Frontend + API |
+| **Application** | http://localhost:80 (default http port) | - | Frontend + API |
 | **Jaeger (Tracing)** | http://localhost:16686 | - | Distributed tracing UI |
 | **Kibana (Logs)** | http://localhost/kibana | - | Log search & analysis |
 | **Grafana (Metrics)** | http://localhost/grafana | admin / grafana | Metrics dashboards |
